@@ -12,6 +12,7 @@ import { ProfilePage } from './components/profile/ProfilePage';
 import { AdministrationPage } from './components/administration/AdministrationPage';
 import { SupportPage } from './components/support/SupportPage';
 import { TicketsPage } from './components/tickets/TicketsPage';
+import { PipelinePage } from './components/pipeline/PipelinePage';
 import { ChatWidget } from './components/chat/ChatWidget';
 import { LoginPage } from './components/auth/LoginPage';
 import { authService } from './services/auth';
@@ -70,6 +71,7 @@ export default function App() {
             <Route path="/customers" element={<CustomersPage />} />
             <Route path="/conversations" element={<ConversationsPage />} />
             <Route path="/campaigns" element={<CampaignsPage />} />
+            <Route path="/pipeline" element={<PipelinePage />} />
             <Route path="/reporting" element={<ReportingPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/administration/*" element={<AdministrationPage />} />
