@@ -17,11 +17,44 @@ import { ChatWidget } from './components/chat/ChatWidget';
 import { LoginPage } from './components/auth/LoginPage';
 import { authService } from './services/auth';
 import { themeService } from './services/theme';
+import { supabase } from './services/supabase';
+import toast from 'react-hot-toast';
 
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [user, setUser] = useState(authService.getCurrentUser());
+  const [user, setUser] = useState(null);
+  const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
   const navigate = useNavigate();
+
+  // Check for user on first load
+  useEffect(() => {
+    const currentUser = authService.getCurrentUser();
+    setUser(currentUser);
+  }, []);
+
+  // Check Supabase connection
+  useEffect(() => {
+    const checkSupabaseConnection = async () => {
+      try {
+        // Simple query to check connection
+        const { error } = await supabase.from('customers').select('count', { count: 'exact', head: true });
+        if (error) {
+          console.error('Supabase connection error:', error);
+          setIsSupabaseConnected(false);
+          if (user) {
+            toast.error('Database connection error. Please connect to Supabase.');
+          }
+        } else {
+          setIsSupabaseConnected(true);
+        }
+      } catch (error) {
+        console.error('Error checking Supabase connection:', error);
+        setIsSupabaseConnected(false);
+      }
+    };
+
+    checkSupabaseConnection();
+  }, [user]);
 
   // Apply theme settings when app loads
   useEffect(() => {
@@ -30,6 +63,7 @@ export default function App() {
   }, []);
 
   const handleLogin = (userData) => {
+    console.log('Login successful, user data:', userData);
     setUser(userData);
     navigate('/dashboard');
   };
@@ -57,6 +91,14 @@ export default function App() {
         onLogout={handleLogout}
         user={user}
       />
+      
+      {!isSupabaseConnected && (
+        <div className="bg-amber-100 border-l-4 border-amber-500 text-amber-700 p-4">
+          <p className="font-bold">Database Connection Required</p>
+          <p>Please click the "Connect to Supabase" button in the top right to set up the database.</p>
+        </div>
+      )}
+      
       <div className="max-w-[1440px] mx-auto">
         <div className="flex">
           <Sidebar 

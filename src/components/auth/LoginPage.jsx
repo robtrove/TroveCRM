@@ -6,17 +6,21 @@ export function LoginPage({ onLogin }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
 
     try {
       const user = await authService.login(username, password);
       toast.success('Welcome back!');
       onLogin(user);
     } catch (error) {
-      toast.error(error.message);
+      console.error('Login error:', error);
+      setError(error.message || 'Login failed. Please try again.');
+      toast.error(error.message || 'Login failed');
     } finally {
       setLoading(false);
     }
@@ -33,6 +37,12 @@ export function LoginPage({ onLogin }) {
 
         <form onSubmit={handleSubmit} className="bg-white dark:bg-dark-card rounded-2xl shadow-lg p-8">
           <div className="space-y-6">
+            {error && (
+              <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-3 rounded-lg text-sm">
+                {error}
+              </div>
+            )}
+            
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Username

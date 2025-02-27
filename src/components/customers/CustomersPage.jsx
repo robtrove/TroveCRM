@@ -1,34 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { CustomerFilters } from './CustomerFilters';
 import { CustomerTable } from './CustomerTable';
 import { AddCustomerModal } from './AddCustomerModal';
+import { customerService } from '../../services/supabase';
 import toast from 'react-hot-toast';
 
-const initialCustomers = [
-  {
-    id: 1,
-    name: 'Alice Freeman',
-    email: 'alice@example.com',
-    status: 'active',
-    spent: 1200,
-    lastOrder: '2023-12-20',
-    avatar: 'https://cdn.usegalileo.ai/stability/117a7a12-7704-4917-9139-4a3f76c42e78.png',
-    company: 'TechCorp Inc',
-    companySize: '1000+',
-    industry: 'Technology',
-    website: 'https://techcorp.com',
-    timezone: 'America/New_York',
-    tags: ['enterprise', 'tech']
-  }
-];
-
 export function CustomersPage() {
-  const [customers, setCustomers] = useState(initialCustomers);
+  const [customers, setCustomers] = useState([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [selectedCustomers, setSelectedCustomers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
     search: '',
     status: 'all',
@@ -41,29 +25,132 @@ export function CustomersPage() {
     industry: ''
   });
 
-  const handleAddCustomer = (newCustomer) => {
-    setCustomers([...customers, newCustomer]);
+  // Fetch customers on component mount
+  useEffect(() => {
+    fetchCustomers();
+  }, []);
+
+  const fetchCustomers = async () => {
+    try {
+      setLoading(true);
+      const data = await customerService.getCustomers();
+      setCustomers(data);
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+      toast.error('Failed to load customers');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleEditCustomer = (customer) => {
-    // TODO: Implement edit functionality
-    console.log('Edit customer:', customer);
+  const handleAddCustomer = async (newCustomer) => {
+    try {
+      // Format tags as an array if it comes as a string
+      if (typeof newCustomer.tags === 'string') {
+        newCustomer.tags = newCustomer.tags.split(',').map(tag => tag.trim()).filter(Boolean);
+      }
+
+      // Create new customer in the database
+      const savedCustomer = await customerService.createCustomer({
+        name: newCustomer.name,
+        email: newCustomer.email,
+        status: newCustomer.status || 'active',
+        avatar: newCustomer.avatar,
+        company: newCustomer.company,
+        company_size: newCustomer.companySize,
+        industry: newCustomer.industry,
+        website: newCustomer.website,
+        timezone: newCustomer.timezone,
+        tags: newCustomer.tags || [],
+        notes: newCustomer.notes,
+        spent: newCustomer.spent || 0,
+        last_order: newCustomer.lastOrder
+      });
+
+      // Format the returned customer object to match the app's format
+      const formattedCustomer = {
+        ...savedCustomer,
+        companySize: savedCustomer.company_size,
+        lastOrder: savedCustomer.last_order
+      };
+
+      setCustomers([formattedCustomer, ...customers]);
+      toast.success('Customer added successfully');
+    } catch (error) {
+      console.error('Error adding customer:', error);
+      toast.error('Failed to add customer');
+    }
   };
 
-  const handleDeleteCustomer = (customerId) => {
-    setCustomers(customers.filter(c => c.id !== customerId));
-    toast.success('Customer deleted successfully');
+  const handleEditCustomer = async (customer) => {
+    try {
+      // Format tags as an array if it comes as a string
+      if (typeof customer.tags === 'string') {
+        customer.tags = customer.tags.split(',').map(tag => tag.trim()).filter(Boolean);
+      }
+
+      // Map the customer data to match the database schema
+      const updates = {
+        name: customer.name,
+        email: customer.email,
+        status: customer.status,
+        avatar: customer.avatar,
+        company: customer.company,
+        company_size: customer.companySize,
+        industry: customer.industry,
+        website: customer.website,
+        timezone: customer.timezone,
+        tags: customer.tags,
+        notes: customer.notes,
+        spent: customer.spent,
+        last_order: customer.lastOrder,
+        updated_at: new Date().toISOString()
+      };
+
+      // Update customer in the database
+      const updatedCustomer = await customerService.updateCustomer(customer.id, updates);
+      
+      // Format the returned customer object to match the app's format
+      const formattedCustomer = {
+        ...updatedCustomer,
+        companySize: updatedCustomer.company_size,
+        lastOrder: updatedCustomer.last_order
+      };
+
+      setCustomers(customers.map(c => c.id === customer.id ? formattedCustomer : c));
+      toast.success('Customer updated successfully');
+    } catch (error) {
+      console.error('Error updating customer:', error);
+      toast.error('Failed to update customer');
+    }
   };
 
-  const handleDeleteSelected = () => {
+  const handleDeleteCustomer = async (customerId) => {
+    try {
+      await customerService.deleteCustomer(customerId);
+      setCustomers(customers.filter(c => c.id !== customerId));
+      toast.success('Customer deleted successfully');
+    } catch (error) {
+      console.error('Error deleting customer:', error);
+      toast.error('Failed to delete customer');
+    }
+  };
+
+  const handleDeleteSelected = async () => {
     if (selectedCustomers.length === 0) return;
 
-    const updatedCustomers = customers.filter(
-      customer => !selectedCustomers.includes(customer.id)
-    );
-    setCustomers(updatedCustomers);
-    setSelectedCustomers([]);
-    toast.success(`${selectedCustomers.length} customers deleted`);
+    try {
+      // Delete all selected customers
+      await Promise.all(selectedCustomers.map(id => customerService.deleteCustomer(id)));
+      
+      // Update state
+      setCustomers(customers.filter(customer => !selectedCustomers.includes(customer.id)));
+      setSelectedCustomers([]);
+      toast.success(`${selectedCustomers.length} customers deleted`);
+    } catch (error) {
+      console.error('Error deleting customers:', error);
+      toast.error('Failed to delete customers');
+    }
   };
 
   const handleExportCSV = () => {
@@ -87,7 +174,7 @@ export function CustomersPage() {
         customer.company || '',
         customer.industry || '',
         customer.spent,
-        customer.lastOrder,
+        customer.last_order || customer.lastOrder || '',
         customer.created_at
       ].join(','))
     ].join('\n');
@@ -106,8 +193,8 @@ export function CustomersPage() {
     if (filters.search) {
       const search = filters.search.toLowerCase();
       return (
-        customer.name.toLowerCase().includes(search) ||
-        customer.email.toLowerCase().includes(search) ||
+        customer.name?.toLowerCase().includes(search) ||
+        customer.email?.toLowerCase().includes(search) ||
         customer.company?.toLowerCase().includes(search)
       );
     }
@@ -117,7 +204,7 @@ export function CustomersPage() {
     if (filters.tags?.length > 0 && !filters.tags.some(tag => customer.tags?.includes(tag))) {
       return false;
     }
-    if (filters.companySize && customer.companySize !== filters.companySize) {
+    if (filters.companySize && customer.companySize !== filters.companySize && customer.company_size !== filters.companySize) {
       return false;
     }
     if (filters.industry && customer.industry !== filters.industry) {
@@ -135,9 +222,11 @@ export function CustomersPage() {
       case 'spent':
         return b.spent - a.spent;
       case 'lastOrder':
-        return new Date(b.lastOrder) - new Date(a.lastOrder);
+        const dateA = a.lastOrder || a.last_order;
+        const dateB = b.lastOrder || b.last_order;
+        return new Date(dateB || 0) - new Date(dateA || 0);
       default:
-        return a.name.localeCompare(b.name);
+        return a.name?.localeCompare(b.name || '');
     }
   });
 
@@ -203,13 +292,19 @@ export function CustomersPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <CustomerTable 
-                customers={filteredCustomers}
-                selectedCustomers={selectedCustomers}
-                onSelectCustomers={setSelectedCustomers}
-                onEdit={handleEditCustomer}
-                onDelete={handleDeleteCustomer}
-              />
+              {loading ? (
+                <div className="flex justify-center p-8">
+                  <p>Loading customers...</p>
+                </div>
+              ) : (
+                <CustomerTable 
+                  customers={filteredCustomers}
+                  selectedCustomers={selectedCustomers}
+                  onSelectCustomers={setSelectedCustomers}
+                  onEdit={handleEditCustomer}
+                  onDelete={handleDeleteCustomer}
+                />
+              )}
             </CardContent>
           </Card>
         </div>

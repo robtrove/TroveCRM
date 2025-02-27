@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Draggable } from 'react-beautiful-dnd';
 import { format } from 'date-fns';
 
-export function DealCard({ deal, index, onClick }) {
+const DealCard = memo(function DealCard({ deal, index, onClick }) {
   return (
     <Draggable draggableId={deal.id.toString()} index={index}>
       {(provided, snapshot) => (
@@ -52,4 +52,6 @@ export function DealCard({ deal, index, onClick }) {
       )}
     </Draggable>
   );
-}
+});
+
+export { DealCard };

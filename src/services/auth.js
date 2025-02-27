@@ -32,14 +32,19 @@ const users = [
 export const authService = {
   login: (username, password) => {
     return new Promise((resolve, reject) => {
-      const user = users.find(u => u.username === username && u.password === password);
-      if (user) {
-        const { password, ...userWithoutPassword } = user;
-        localStorage.setItem('user', JSON.stringify(userWithoutPassword));
-        resolve(userWithoutPassword);
-      } else {
-        reject(new Error('Invalid username or password'));
-      }
+      setTimeout(() => {
+        const user = users.find(u => u.username === username && u.password === password);
+        if (user) {
+          // Create a new object without the password
+          const { password: _, ...userWithoutPassword } = user;
+          localStorage.setItem('user', JSON.stringify(userWithoutPassword));
+          console.log('Login successful', userWithoutPassword);
+          resolve(userWithoutPassword);
+        } else {
+          console.error('Invalid username or password');
+          reject(new Error('Invalid username or password'));
+        }
+      }, 500); // Add a small delay to simulate network request
     });
   },
 
@@ -48,8 +53,13 @@ export const authService = {
   },
 
   getCurrentUser: () => {
-    const user = localStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
+    try {
+      const userStr = localStorage.getItem('user');
+      return userStr ? JSON.parse(userStr) : null;
+    } catch (error) {
+      console.error('Error getting current user:', error);
+      return null;
+    }
   },
 
   isAdmin: () => {

@@ -34,6 +34,17 @@ export function CustomerTable({ customers, selectedCustomers, onSelectCustomers,
     }
   };
 
+  // Helper function to safely format dates
+  const formatDate = (date) => {
+    if (!date) return 'N/A';
+    try {
+      return format(new Date(date), 'MMM d, yyyy');
+    } catch (error) {
+      console.warn(`Invalid date format: ${date}`);
+      return 'Invalid date';
+    }
+  };
+
   return (
     <>
       <div className="overflow-x-auto">
@@ -43,7 +54,7 @@ export function CustomerTable({ customers, selectedCustomers, onSelectCustomers,
               <th className="text-left py-3 px-4">
                 <input
                   type="checkbox"
-                  checked={selectedCustomers.length === customers.length}
+                  checked={selectedCustomers.length === customers.length && customers.length > 0}
                   onChange={handleSelectAll}
                   className="rounded border-gray-300 text-primary focus:ring-primary"
                 />
@@ -104,11 +115,11 @@ export function CustomerTable({ customers, selectedCustomers, onSelectCustomers,
                   </span>
                 </td>
                 <td className="py-3 px-4">
-                  <p className="text-sm text-gray-900 dark:text-white">${customer.spent.toLocaleString()}</p>
+                  <p className="text-sm text-gray-900 dark:text-white">${(customer.spent || 0).toLocaleString()}</p>
                 </td>
                 <td className="py-3 px-4">
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {format(new Date(customer.lastOrder), 'MMM d, yyyy')}
+                    {formatDate(customer.lastOrder || customer.last_order)}
                   </p>
                 </td>
                 <td className="py-3 px-4 text-right">

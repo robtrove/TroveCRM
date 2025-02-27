@@ -1,100 +1,130 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { CampaignsList } from './CampaignsList';
 import { CampaignModal } from './CampaignModal';
 import { CampaignStats } from './CampaignStats';
-
-const initialCampaigns = [
-  {
-    id: 1,
-    name: 'Summer Sale 2023',
-    status: 'active',
-    type: 'email',
-    audience: 'all-customers',
-    startDate: '2023-12-01',
-    endDate: '2023-12-31',
-    budget: 5000,
-    spent: 2500,
-    metrics: {
-      sent: 10000,
-      opened: 4500,
-      clicked: 2000,
-      converted: 500
-    }
-  },
-  {
-    id: 2,
-    name: 'New Product Launch',
-    status: 'scheduled',
-    type: 'social',
-    audience: 'premium-customers',
-    startDate: '2024-01-15',
-    endDate: '2024-02-15',
-    budget: 10000,
-    spent: 0,
-    metrics: {
-      impressions: 0,
-      engagement: 0,
-      clicks: 0,
-      conversions: 0
-    }
-  },
-  {
-    id: 3,
-    name: 'Black Friday',
-    status: 'completed',
-    type: 'email',
-    audience: 'all-customers',
-    startDate: '2023-11-20',
-    endDate: '2023-11-27',
-    budget: 8000,
-    spent: 8000,
-    metrics: {
-      sent: 15000,
-      opened: 8000,
-      clicked: 4000,
-      converted: 1200
-    }
-  }
-];
+import { campaignService } from '../../services/supabase';
+import toast from 'react-hot-toast';
 
 export function CampaignsPage() {
-  const [campaigns, setCampaigns] = useState(initialCampaigns);
+  const [campaigns, setCampaigns] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
     status: 'all',
     type: 'all',
     search: ''
   });
 
-  const handleCreateCampaign = (campaign) => {
-    setCampaigns([...campaigns, { ...campaign, id: Date.now() }]);
+  // Fetch campaigns on component mount
+  useEffect(() => {
+    fetchCampaigns();
+  }, []);
+
+  const fetchCampaigns = async () => {
+    try {
+      setLoading(true);
+      const data = await campaignService.getCampaigns();
+      setCampaigns(data);
+    } catch (error) {
+      console.error('Error fetching campaigns:', error);
+      toast.error('Failed to load campaigns');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleUpdateCampaign = (updatedCampaign) => {
-    setCampaigns(campaigns.map(c => 
-      c.id === updatedCampaign.id ? updatedCampaign : c
-    ));
+  const handleCreateCampaign = async (campaign) => {
+    try {
+      // Map the campaign data to match the database schema
+      const newCampaign = {
+        name: campaign.name,
+        status: campaign.status,
+        type: campaign.type,
+        audience: campaign.audience,
+        start_date: campaign.startDate,
+        end_date: campaign.endDate,
+        budget: campaign.budget,
+        spent: 0,
+        metrics: campaign.metrics || { sent: 0, opened: 0, clicked: 0, converted: 0 }
+      };
+
+      // Create campaign in the database
+      const savedCampaign = await campaignService.createCampaign(newCampaign);
+
+      // Format the returned campaign object to match the app's format
+      const formattedCampaign = {
+        ...savedCampaign,
+        startDate: savedCampaign.start_date,
+        endDate: savedCampaign.end_date
+      };
+
+      setCampaigns([formattedCampaign, ...campaigns]);
+      toast.success('Campaign created successfully');
+    } catch (error) {
+      console.error('Error creating campaign:', error);
+      toast.error('Failed to create campaign');
+    }
   };
 
-  const handleDeleteCampaign = (id) => {
-    setCampaigns(campaigns.filter(c => c.id !== id));
+  const handleUpdateCampaign = async (updatedCampaign) => {
+    try {
+      // Map the campaign data to match the database schema
+      const updates = {
+        name: updatedCampaign.name,
+        status: updatedCampaign.status,
+        type: updatedCampaign.type,
+        audience: updatedCampaign.audience,
+        start_date: updatedCampaign.startDate,
+        end_date: updatedCampaign.endDate,
+        budget: updatedCampaign.budget,
+        metrics: updatedCampaign.metrics,
+        updated_at: new Date().toISOString()
+      };
+
+      // Update campaign in the database
+      const savedCampaign = await campaignService.updateCampaign(updatedCampaign.id, updates);
+
+      // Format the returned campaign object to match the app's format
+      const formattedCampaign = {
+        ...savedCampaign,
+        startDate: savedCampaign.start_date,
+        endDate: savedCampaign.end_date
+      };
+
+      setCampaigns(campaigns.map(c => c.id === updatedCampaign.id ? formattedCampaign : c));
+      toast.success('Campaign updated successfully');
+    } catch (error) {
+      console.error('Error updating campaign:', error);
+      toast.error('Failed to update campaign');
+    }
+  };
+
+  const handleDeleteCampaign = async (id) => {
+    try {
+      await campaignService.deleteCampaign(id);
+      setCampaigns(campaigns.filter(c => c.id !== id));
+      toast.success('Campaign deleted successfully');
+    } catch (error) {
+      console.error('Error deleting campaign:', error);
+      toast.error('Failed to delete campaign');
+    }
   };
 
   const filteredCampaigns = campaigns.filter(campaign => {
     if (filters.status !== 'all' && campaign.status !== filters.status) return false;
     if (filters.type !== 'all' && campaign.type !== filters.type) return false;
-    if (filters.search && !campaign.name.toLowerCase().includes(filters.search.toLowerCase())) return false;
+    if (filters.search && !campaign.name?.toLowerCase().includes(filters.search.toLowerCase())) return false;
     return true;
   });
 
   // Calculate total metrics
   const totalMetrics = campaigns.reduce((acc, campaign) => {
     if (campaign.type === 'email') {
-      acc.emailsSent += campaign.metrics.sent || 0;
-      acc.conversions += campaign.metrics.converted || 0;
+      acc.emailsSent += campaign.metrics?.sent || 0;
+      acc.conversions += campaign.metrics?.converted || 0;
     }
     acc.spent += campaign.spent || 0;
     return acc;
@@ -167,14 +197,20 @@ export function CampaignsPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <CampaignsList
-                campaigns={filteredCampaigns}
-                onEdit={(campaign) => {
-                  setSelectedCampaign(campaign);
-                  setIsModalOpen(true);
-                }}
-                onDelete={handleDeleteCampaign}
-              />
+              {loading ? (
+                <div className="flex justify-center p-8">
+                  <p>Loading campaigns...</p>
+                </div>
+              ) : (
+                <CampaignsList
+                  campaigns={filteredCampaigns}
+                  onEdit={(campaign) => {
+                    setSelectedCampaign(campaign);
+                    setIsModalOpen(true);
+                  }}
+                  onDelete={handleDeleteCampaign}
+                />
+              )}
             </CardContent>
           </Card>
         </div>

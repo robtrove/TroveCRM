@@ -19,8 +19,9 @@ export function AddCustomerModal({ isOpen, onClose, onAdd }) {
     tags: [],
     notes: ''
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!formData.name || !formData.email) {
@@ -28,14 +29,36 @@ export function AddCustomerModal({ isOpen, onClose, onAdd }) {
       return;
     }
 
-    onAdd({
-      ...formData,
-      spent: 0,
-      lastOrder: new Date().toISOString().split('T')[0]
-    });
-    
-    toast.success('Customer added successfully');
-    onClose();
+    setIsSubmitting(true);
+    try {
+      await onAdd({
+        ...formData,
+        spent: 0,
+        lastOrder: new Date().toISOString().split('T')[0]
+      });
+      
+      // Reset form
+      setFormData({
+        name: '',
+        email: '',
+        status: 'active',
+        avatar: 'https://cdn.usegalileo.ai/stability/117a7a12-7704-4917-9139-4a3f76c42e78.png',
+        company: '',
+        companySize: '',
+        industry: '',
+        website: '',
+        timezone: 'UTC',
+        tags: [],
+        notes: ''
+      });
+      
+      onClose();
+    } catch (error) {
+      console.error('Error adding customer:', error);
+      toast.error('Failed to add customer');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -223,15 +246,18 @@ export function AddCustomerModal({ isOpen, onClose, onAdd }) {
               </div>
 
               <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100 dark:border-gray-800">
-                <Button
-                  type="button"
+                <Button 
+                  type="button" 
                   variant="secondary"
                   onClick={onClose}
                 >
                   Cancel
                 </Button>
-                <Button type="submit">
-                  Add Customer
+                <Button 
+                  type="submit"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Adding...' : 'Add Customer'}
                 </Button>
               </div>
             </form>
